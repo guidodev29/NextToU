@@ -6,10 +6,10 @@ import android.app.PendingIntent
 import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
@@ -17,7 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import java.text.SimpleDateFormat
 import java.util.*
@@ -30,32 +32,42 @@ fun ItineraryScreen(navController: NavController) {
     var selectedDateTime by remember { mutableStateOf("") }
     val calendar = Calendar.getInstance()
 
-    var showError by remember { mutableStateOf(false) }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        verticalArrangement = Arrangement.Center, // Centrar verticalmente
+        horizontalAlignment = Alignment.CenterHorizontally // Centrar horizontalmente
     ) {
+        // Título
         Text(
-            text = "Agregar Evento al Itinerario",
-            style = MaterialTheme.typography.headlineSmall,
-            color = Color.White.copy(alpha = 0.8f),
-            modifier = Modifier.padding(8.dp)
-
+            text = "Agregar un nuevo evento",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            modifier = Modifier.padding(bottom = 28.dp)
         )
 
+        // Inputs para agregar título y descripción del evento
         TextField(
             value = title,
             onValueChange = { title = it },
             label = { Text("Título del evento") },
-            modifier = Modifier.fillMaxWidth(),
-            isError = showError && title.isBlank()
+            modifier = Modifier.fillMaxWidth(0.8f) // Ancho de 80%
         )
-        TextField(value = description, onValueChange = { description = it }, label = { Text("Descripción del evento") }, isError = showError && title.isBlank())
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        TextField(
+            value = description,
+            onValueChange = { description = it },
+            label = { Text("Descripción del evento") },
+            modifier = Modifier.fillMaxWidth(0.8f) // Ancho de 80%
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Botón para seleccionar fecha y hora
         Button(
             onClick = {
                 val datePickerDialog = DatePickerDialog(
@@ -77,54 +89,63 @@ fun ItineraryScreen(navController: NavController) {
                 )
                 datePickerDialog.show()
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(0.8f) // Ancho de 80%
         ) {
-            Text("Seleccionar Fecha y Hora" )
+            Text("Seleccionar Fecha y Hora")
         }
 
-        Text(text = "Fecha y Hora seleccionada: $selectedDateTime", modifier = Modifier.padding(8.dp),  color = Color.White.copy(alpha = 0.8f))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        if (showError && selectedDateTime.isBlank()) {
-            Text(text = "Por favor selecciona una fecha y hora", color = MaterialTheme.colorScheme.error)
-        }
+        // Mostrar la fecha y hora seleccionada
+        Text(
+            text = "Fecha y Hora seleccionada: $selectedDateTime",
+            color = Color.White,
+            modifier = Modifier.fillMaxWidth(0.8f) // Ancho de 80%
+        )
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Botón para agregar el evento
         Button(
             onClick = {
                 if (title.isNotBlank() && selectedDateTime.isNotBlank()) {
-                    saveEventToLocalStorage(context, title, selectedDateTime)
-                    scheduleNotification(context, title, calendar.timeInMillis)
-                    Toast.makeText(context, "Evento guardado y notificación programada", Toast.LENGTH_SHORT).show()
-                    showError = false
-                } else {
-                    // Mostrar error si algún campo está vacío
-                    showError = true
+                    saveEventToLocalStorage(context, title, description, selectedDateTime)
+                    val eventDateTimeMillis = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).parse(selectedDateTime)?.time
+                    eventDateTimeMillis?.let {
+                        scheduleNotification(context, title, it)
+                    }
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(0.8f) // Ancho de 80%
         ) {
             Text("Guardar evento y programar notificación")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Botón para ver eventos
         Button(
-            onClick = { navController.navigate("events_screen") },
-            modifier = Modifier.fillMaxWidth()
+            onClick = {
+                navController.navigate("events_screen")
+            },
+            modifier = Modifier.fillMaxWidth(0.8f) // Ancho de 80%
         ) {
             Text("Ver todos los eventos")
         }
     }
 }
 
-fun saveEventToLocalStorage(context: Context, title: String, dateTime: String) {
+// Función para guardar el evento en el almacenamiento local
+fun saveEventToLocalStorage(context: Context, title: String, description: String, dateTime: String) {
     val sharedPreferences = context.getSharedPreferences("events", Context.MODE_PRIVATE)
     val editor = sharedPreferences.edit()
     val eventList = sharedPreferences.getStringSet("event_list", mutableSetOf()) ?: mutableSetOf()
-    eventList.add("$title|$dateTime")
+    eventList.add("$title|$description|$dateTime")
     editor.putStringSet("event_list", eventList)
     editor.apply()
 }
 
+// Función para programar una notificación
 fun scheduleNotification(context: Context, title: String, timeInMillis: Long) {
     val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     val intent = Intent(context, NotificationReceiver::class.java).apply {
@@ -135,9 +156,17 @@ fun scheduleNotification(context: Context, title: String, timeInMillis: Long) {
         context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    try {
-        alarmManager.setExact(AlarmManager.RTC_WAKEUP, timeInMillis, pendingIntent)
-    } catch (e: SecurityException) {
-        Toast.makeText(context, "No se puede programar la alarma sin permisos", Toast.LENGTH_SHORT).show()
+    // Verificar si se puede programar alarmas exactas
+    if (alarmManager.canScheduleExactAlarms()) {
+        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timeInMillis, pendingIntent)
+        Toast.makeText(context, "Evento agregado con éxito...", Toast.LENGTH_LONG).show()
+
+    } else {
+        // Mostrar un mensaje o dirigir al usuario a la configuración
+        Toast.makeText(context, "La aplicación necesita permiso para programar alarmas exactas. Por favor, habilítelo en la configuración.", Toast.LENGTH_LONG).show()
+
+        // Redirigir al usuario a la configuración para habilitar el permiso
+        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+        context.startActivity(intent)
     }
 }

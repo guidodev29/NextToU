@@ -22,7 +22,6 @@ class NotificationReceiver : BroadcastReceiver() {
             }
         } else {
             // Manejo de error si no se tienen los permisos de notificación
-            // Esto es solo informativo, no es necesario tener un Toast aquí en la versión final
         }
     }
 }

@@ -6,7 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,7 +19,6 @@ class SplashScreen : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Navegar a MainActivity después del tiempo de espera
         lifecycleScope.launch {
             delay(3000) // Esperar 3 segundos
             val intent = Intent(this@SplashScreen, MainActivity::class.java)
@@ -40,8 +38,7 @@ fun SplashScreenContent() {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        // Reemplaza con tu logo de la aplicación
-        Image(painter = painterResource(R.drawable.ic_launcher_foreground), contentDescription = "Logo")
+        Image(painter = painterResource(R.drawable.ic_launcher_logontu), contentDescription = "Logo")
     }
 }
 

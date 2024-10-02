@@ -114,7 +114,7 @@ fun MapScreen() {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Botón adicional para explorar más (diseño consistente con el resto de la app)
+                // Botón adicional
                 Button(
                     onClick = { /* MERO ADORNO */ },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF03DAC5)),

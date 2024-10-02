@@ -1,5 +1,4 @@
 package com.api.contigo
-
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -28,10 +27,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.navigation.NavController
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun CameraScreen(
     navController: NavController,
@@ -42,6 +45,12 @@ fun CameraScreen(
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showCamera by remember { mutableStateOf(true) }
 
+    // Gestión del permiso de la cámara
+    val cameraPermissionState = rememberPermissionState(android.Manifest.permission.CAMERA)
+
+    // Gestión del permiso para acceder a los archivos
+    val storagePermissionState = rememberPermissionState(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+
     // Lanzador para la cámara con Uri
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
@@ -49,10 +58,9 @@ fun CameraScreen(
         if (success) {
             bitmap = photoUri?.let { uri ->
                 context.contentResolver.openInputStream(uri)?.use {
-                    // Decodificar la imagen y rotarla si es necesario
                     BitmapFactory.decodeStream(it)?.let { decodedBitmap ->
                         val rotatedBitmap = rotateImageIfRequired(context, decodedBitmap, uri)
-                        saveRotatedBitmap(context, rotatedBitmap, uri) // Guardar la imagen rotada directamente
+                        saveRotatedBitmap(context, rotatedBitmap, uri)
                         rotatedBitmap
                     }
                 }
@@ -66,45 +74,84 @@ fun CameraScreen(
         modifier = Modifier
             .fillMaxSize()
             .paint(
-                painter = painterResource(id = R.drawable.background3), // Asigna el recurso de imagen de fondo
+                painter = painterResource(id = R.drawable.background3),
                 contentScale = ContentScale.Crop
             )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp), // Ajusta el padding para la organización de los elementos
+                .padding(16.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (showCamera) {
-                // Botón más grande para tomar foto
+                if (cameraPermissionState.status.isGranted) {
+                    // Botón para tomar foto
+                    Button(
+                        onClick = {
+                            val imageUri = createImageUri(context)
+                            photoUri = imageUri
+                            launcher.launch(imageUri)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF6200EE),
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                    ) {
+                        Text(
+                            text = "Captura tu momento",
+                            style = androidx.compose.ui.text.TextStyle(fontSize = 18.sp)
+                        )
+                    }
+                } else {
+                    // Botón para solicitar permiso de cámara
+                    Button(
+                        onClick = { cameraPermissionState.launchPermissionRequest() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF6200EE),
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                    ) {
+                        Text(
+                            text = "Solicitar permiso de cámara",
+                            style = androidx.compose.ui.text.TextStyle(fontSize = 18.sp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Botón para ver fotos (solicita acceso a archivos)
                 Button(
                     onClick = {
-                        // Creamos el archivo URI donde se guardará la foto
-                        val imageUri = createImageUri(context)
-                        photoUri = imageUri
-                        launcher.launch(imageUri)
+                        if (storagePermissionState.status.isGranted) {
+                            navController.navigate("photo_gallery")
+                        } else {
+                            storagePermissionState.launchPermissionRequest()
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF6200EE), // Color de fondo del botón
-                        contentColor = Color.White // Color del texto
+                        containerColor = Color(0xFF6200EE),
+                        contentColor = Color.White
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(80.dp) // Botón más alto para mayor visibilidad
+                        .height(80.dp)
                 ) {
-                    Text(
-                        text = "Captura tu momento",
-                        style = androidx.compose.ui.text.TextStyle(fontSize = 18.sp)
-                    )
+                    Text("Ver Fotos")
                 }
             } else {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    // Mostrar previsualización de la imagen capturada
                     bitmap?.let {
                         Image(
                             bitmap = it.asImageBitmap(),
@@ -112,14 +159,13 @@ fun CameraScreen(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(400.dp) // Mostrar imagen más grande
+                                .height(400.dp)
                                 .padding(16.dp)
                         )
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Botón para guardar la foto
                     Button(
                         onClick = {
                             photoUri?.let {
@@ -136,7 +182,6 @@ fun CameraScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Botón para volver a la pantalla principal
                     Button(
                         onClick = onBackToMainScreen,
                         colors = ButtonDefaults.buttonColors(
@@ -151,6 +196,8 @@ fun CameraScreen(
         }
     }
 }
+
+
 
 // Función para rotar la imagen si es necesario
 fun rotateImageIfRequired(context: Context, bitmap: Bitmap, uri: Uri): Bitmap {
@@ -187,7 +234,7 @@ fun createImageUri(context: Context): Uri {
 
     return FileProvider.getUriForFile(
         context,
-        "${context.packageName}.provider", // Asegúrate de que esto coincida con tu `provider` en el AndroidManifest
+        "${context.packageName}.provider",
         photoFile
     )
 }
