@@ -33,4 +33,5 @@ NextToU es una aplicación móvil diseñada para ayudarte a capturar, organizar 
    git clone https://github.com/guidodev29/NextToU.git
 
 ## VIDEO DEL FUNCIONAMIENTO: 
+-- https://youtu.be/y0vmwZED8J4
 
